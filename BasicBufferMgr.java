@@ -13,15 +13,22 @@ import java.util.PriorityQueue;
 class BasicBufferMgr {
    private Buffer[] bufferpool;
    private int numAvailable;
+   
+   
+   
    /*new code for hashmap,
     *put in the hashmap when pinNew,
-    *delete from map when flush.*/
+    *delete from map when flush.
+    *Meanwhile use ProrityQueue to choose LSN*/
    private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
    private PriorityQueue<Buffer> bufferQueue = new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>() {  
        public int compare(Buffer b1, Buffer b2) {  
            return b2.getLSN() - b1.getLSN();  
          }  
        });
+   
+   
+   
    
    /**
     * Creates a buffer manager having the specified number 
@@ -72,7 +79,10 @@ class BasicBufferMgr {
          if (buff == null)
             return null;
          buff.assignToBlock(blk);
-         //bufferPoolMap.put(buff.block(), buff);
+         
+         /* new code here, add this buffer into hashmap and queue*/
+         
+         bufferPoolMap.put(buff.block(), buff);
          //bufferQueue.offer(buff);
       }
       if (!buff.isPinned())
@@ -98,8 +108,12 @@ class BasicBufferMgr {
       buff.assignToNew(filename, fmtr);
       numAvailable--;
       buff.pin();
-      //bufferPoolMap.put(buff.block(), buff);
+      
+       /* new code here, add this buffer into hashmap and queue*/
+      bufferPoolMap.put(buff.block(), buff);
       //bufferQueue.offer(buff);
+      
+      
       return buff;
    }
    
@@ -113,7 +127,10 @@ class BasicBufferMgr {
       if (!buff.isPinned())
       {
     	  numAvailable++;
-    	  //bufferQueue.offer(buff);
+         
+         /*new code here, offer this useless buffer into queue*/
+         
+    	  bufferQueue.offer(buff);
       }
    }
    
@@ -141,6 +158,7 @@ class BasicBufferMgr {
          if (!buff.isPinned())
          return buff;
       
+      /* new code here, choose the LSN from queue, if it is unpinned, remove from hashmap and queue*/
       while(bufferQueue.peek() != null){
     	  Buffer tmp = bufferQueue.poll();
     	  if(!tmp.isPinned()){
