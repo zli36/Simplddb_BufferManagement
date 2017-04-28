@@ -1,30 +1,27 @@
 package simpledb.buffer;
 
 import simpledb.file.*;
-
+import java.util.HashMap;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 /**
- * The publicly-accessible buffer manager.
- * A buffer manager wraps a basic buffer manager, and
- * provides the same methods. The difference is that
- * the methods {@link #pin(Block) pin} and 
- * {@link #pinNew(String, PageFormatter) pinNew}
- * will never return null.
- * If no buffers are currently available, then the
- * calling thread will be placed on a waiting list.
- * The waiting threads are removed from the list when 
- * a buffer becomes available.
- * If a thread has been waiting for a buffer for an
- * excessive amount of time (currently, 10 seconds)
- * then a {@link BufferAbortException} is thrown.
+ * Manages the pinning and unpinning of buffers to blocks.
  * @author Edward Sciore
+ *
  */
-public class BufferMgr {
-   private static final long MAX_TIME = 10000; // 10 seconds
-   private BasicBufferMgr bufferMgr;
+class BasicBufferMgr {
+   private Buffer[] bufferpool;
+   private int numAvailable;
+   
+   
+   
+   
+   private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
+   private PriorityQueue<Buffer> bufferQueue;
    
    /**
-    * Creates a new buffer manager having the specified 
-    * number of buffers.
+    * Creates a buffer manager having the specified number 
+    * of buffer slots.
     * This constructor depends on both the {@link FileMgr} and
     * {@link simpledb.log.LogMgr LogMgr} objects 
     * that it gets from the class
@@ -33,99 +30,136 @@ public class BufferMgr {
     * Thus this constructor cannot be called until 
     * {@link simpledb.server.SimpleDB#initFileAndLogMgr(String)} or
     * is called first.
-    * @param numbuffers the number of buffer slots to allocate
+    * @param numbuffs the number of buffer slots to allocate
     */
-   public BufferMgr(int numbuffers) {
-      bufferMgr = new BasicBufferMgr(numbuffers);
-   }
-   
-   /**
-    * Pins a buffer to the specified block, potentially
-    * waiting until a buffer becomes available.
-    * If no buffer becomes available within a fixed 
-    * time period, then a {@link BufferAbortException} is thrown.
-    * @param blk a reference to a disk block
-    * @return the buffer pinned to that block
-    */
-   public synchronized Buffer pin(Block blk) {
-      try {
-         long timestamp = System.currentTimeMillis();
-         Buffer buff = bufferMgr.pin(blk);
-         while (buff == null && !waitingTooLong(timestamp)) {
-            wait(MAX_TIME);
-            buff = bufferMgr.pin(blk);
-         }
-         if (buff == null)
-            throw new BufferAbortException();
-         return buff;
-      }
-      catch(InterruptedException e) {
-         throw new BufferAbortException();
-      }
-   }
-   
-   /**
-    * Pins a buffer to a new block in the specified file, 
-    * potentially waiting until a buffer becomes available.
-    * If no buffer becomes available within a fixed 
-    * time period, then a {@link BufferAbortException} is thrown.
-    * @param filename the name of the file
-    * @param fmtr the formatter used to initialize the page
-    * @return the buffer pinned to that block
-    */
-   public synchronized Buffer pinNew(String filename, PageFormatter fmtr) {
-      try {
-         long timestamp = System.currentTimeMillis();
-         Buffer buff = bufferMgr.pinNew(filename, fmtr);
-         while (buff == null && !waitingTooLong(timestamp)) {
-            wait(MAX_TIME);
-            buff = bufferMgr.pinNew(filename, fmtr);
-         }
-         if (buff == null)
-            throw new BufferAbortException();
-         return buff;
-      }
-      catch(InterruptedException e) {
-         throw new BufferAbortException();
-      }
-   }
-   
-   /**
-    * Unpins the specified buffer. 
-    * If the buffer's pin count becomes 0,
-    * then the threads on the wait list are notified.
-    * @param buff the buffer to be unpinned
-    */
-   public synchronized void unpin(Buffer buff) {
-      bufferMgr.unpin(buff);
-      if (!buff.isPinned())
-         notifyAll();
+   BasicBufferMgr(int numbuffs) {
+      bufferpool = new Buffer[numbuffs];
+      numAvailable = numbuffs;
+      for (int i=0; i<numbuffs; i++)
+         bufferpool[i] = new Buffer();
+      
+      
+      
+      
+      bufferQueue= new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>(){
+		   public int compare(Buffer b1, Buffer b2){
+			   return b2.getLSN() - b1.getLSN();
+		   }
+  });
    }
    
    /**
     * Flushes the dirty buffers modified by the specified transaction.
     * @param txnum the transaction's id number
     */
-   public void flushAll(int txnum) {
-      bufferMgr.flushAll(txnum);
+   synchronized void flushAll(int txnum) {
+      for (Buffer buff : bufferpool)
+         if (buff.isModifiedBy(txnum))
+         buff.flush();
    }
    
    /**
-    * Returns the number of available (ie unpinned) buffers.
+    * Pins a buffer to the specified block. 
+    * If there is already a buffer assigned to that block
+    * then that buffer is used;  
+    * otherwise, an unpinned buffer from the pool is chosen.
+    * Returns a null value if there are no available buffers.
+    * @param blk a reference to a disk block
+    * @return the pinned buffer
+    */
+   synchronized Buffer pin(Block blk) {
+      Buffer buff = findExistingBuffer(blk);
+      if (buff == null) {
+         buff = chooseUnpinnedBuffer();
+         if (buff == null)
+            return null;
+         buff.assignToBlock(blk);
+         
+         
+         bufferPoolMap.put(blk, buff);
+      }
+      if (!buff.isPinned())
+         numAvailable--;
+      buff.pin();
+      return buff;
+   }
+   
+   /**
+    * Allocates a new block in the specified file, and
+    * pins a buffer to it. 
+    * Returns null (without allocating the block) if 
+    * there are no available buffers.
+    * @param filename the name of the file
+    * @param fmtr a pageformatter object, used to format the new block
+    * @return the pinned buffer
+    */
+   synchronized Buffer pinNew(String filename, PageFormatter fmtr) {
+      Buffer buff = chooseUnpinnedBuffer();
+      if (buff == null)
+         return null;
+      buff.assignToNew(filename, fmtr);
+      bufferPoolMap.put(buff.block(), buff);
+      numAvailable--;
+      buff.pin();
+      return buff;
+   }
+   
+   /**
+    * Unpins the specified buffer.
+    * @param buff the buffer to be unpinned
+    */
+   synchronized void unpin(Buffer buff) {
+      buff.unpin();
+      if (!buff.isPinned())
+      {
+    	  bufferQueue.offer(buff);
+    	  numAvailable++;
+      }
+   }
+   
+   /**
+    * Returns the number of available (i.e. unpinned) buffers.
     * @return the number of available buffers
     */
-   public int available() {
-      return bufferMgr.available();
+   int available() {
+      return numAvailable;
+   }
+   
+   private Buffer findExistingBuffer(Block blk) {
+      for (Buffer buff : bufferpool) {
+         Block b = buff.block();
+         if (b != null && b.equals(blk))
+            return buff;
+      }
+      return null;
+   }
+   
+   private Buffer chooseUnpinnedBuffer() {
+      
+     /*    for (Buffer buff : bufferpool)
+         if (!buff.isPinned())
+         {
+        	 bufferPoolMap.remove(buff.block());
+        	 return buff;
+         }
+      */
+      
+      while(bufferQueue.peek() != null){
+    	  Buffer tmp = bufferQueue.poll();
+    	  if(!tmp.isPinned()){
+    		  bufferPoolMap.remove(tmp.block());
+    		  return tmp;
+    	  }
+      }
+      
+      return null;
    }
    
    public boolean containsMapping(Block blk){
-	   return bufferMgr.containsMapping(blk);
+	   return bufferPoolMap.containsKey(blk);
    }
    
    public Buffer getMapping(Block blk){
-	   return bufferMgr.getMapping(blk);
-   }
-   private boolean waitingTooLong(long starttime) {
-      return System.currentTimeMillis() - starttime > MAX_TIME;
+	   return bufferPoolMap.get(blk);
    }
 }
