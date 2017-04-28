@@ -148,7 +148,10 @@ public class Buffer {
    boolean isPinned() {
       return pins > 0;
    }
-
+   
+   public int getLSN(){
+	   return logSequenceNumber;
+   }
    /**
     * Returns true if the buffer is dirty
     * due to a modification by the specified transaction.
@@ -188,7 +191,5 @@ public class Buffer {
       pins = 0;
    }
    
-   int getLSN(){
-	   return this.logSequenceNumber;
-   }
+   
 }
