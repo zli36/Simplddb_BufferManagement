@@ -81,6 +81,10 @@ public class Buffer {
       contents.setInt(offset, val);
    }
 
+	public void setLSN(int lsn){
+	   if(lsn >= 0)
+		   logSequenceNumber = lsn;
+   }
    /**
     * Writes a string to the specified offset of the
     * buffer's page.
