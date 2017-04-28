@@ -1,165 +1,120 @@
 package simpledb.buffer;
 
+import simpledb.server.*;
+import simpledb.buffer.*;
 import simpledb.file.*;
-import java.util.HashMap;
-import java.util.Comparator;
-import java.util.PriorityQueue;
-/**
- * Manages the pinning and unpinning of buffers to blocks.
- * @author Edward Sciore
- *
- */
-class BasicBufferMgr {
-   private Buffer[] bufferpool;
-   private int numAvailable;
-   
-   
-   
-   
-   private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
-   private PriorityQueue<Buffer> bufferQueue;
-   
-   /**
-    * Creates a buffer manager having the specified number 
-    * of buffer slots.
-    * This constructor depends on both the {@link FileMgr} and
-    * {@link simpledb.log.LogMgr LogMgr} objects 
-    * that it gets from the class
-    * {@link simpledb.server.SimpleDB}.
-    * Those objects are created during system initialization.
-    * Thus this constructor cannot be called until 
-    * {@link simpledb.server.SimpleDB#initFileAndLogMgr(String)} or
-    * is called first.
-    * @param numbuffs the number of buffer slots to allocate
-    */
-   BasicBufferMgr(int numbuffs) {
-      bufferpool = new Buffer[numbuffs];
-      numAvailable = numbuffs;
-      for (int i=0; i<numbuffs; i++)
-         bufferpool[i] = new Buffer();
-      
-      
-      
-      
-      bufferQueue= new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>(){
-		   public int compare(Buffer b1, Buffer b2){
-			   return b2.getLSN() - b1.getLSN();
-		   }
-  });
-   }
-   
-   /**
-    * Flushes the dirty buffers modified by the specified transaction.
-    * @param txnum the transaction's id number
-    */
-   synchronized void flushAll(int txnum) {
-      for (Buffer buff : bufferpool)
-         if (buff.isModifiedBy(txnum))
-         buff.flush();
-   }
-   
-   /**
-    * Pins a buffer to the specified block. 
-    * If there is already a buffer assigned to that block
-    * then that buffer is used;  
-    * otherwise, an unpinned buffer from the pool is chosen.
-    * Returns a null value if there are no available buffers.
-    * @param blk a reference to a disk block
-    * @return the pinned buffer
-    */
-   synchronized Buffer pin(Block blk) {
-      Buffer buff = findExistingBuffer(blk);
-      if (buff == null) {
-         buff = chooseUnpinnedBuffer();
-         if (buff == null)
-            return null;
-         buff.assignToBlock(blk);
-         
-         
-         bufferPoolMap.put(blk, buff);
-      }
-      if (!buff.isPinned())
-         numAvailable--;
-      buff.pin();
-      return buff;
-   }
-   
-   /**
-    * Allocates a new block in the specified file, and
-    * pins a buffer to it. 
-    * Returns null (without allocating the block) if 
-    * there are no available buffers.
-    * @param filename the name of the file
-    * @param fmtr a pageformatter object, used to format the new block
-    * @return the pinned buffer
-    */
-   synchronized Buffer pinNew(String filename, PageFormatter fmtr) {
-      Buffer buff = chooseUnpinnedBuffer();
-      if (buff == null)
-         return null;
-      buff.assignToNew(filename, fmtr);
-      bufferPoolMap.put(buff.block(), buff);
-      numAvailable--;
-      buff.pin();
-      return buff;
-   }
-   
-   /**
-    * Unpins the specified buffer.
-    * @param buff the buffer to be unpinned
-    */
-   synchronized void unpin(Buffer buff) {
-      buff.unpin();
-      if (!buff.isPinned())
-      {
-    	  bufferQueue.offer(buff);
-    	  numAvailable++;
-      }
-   }
-   
-   /**
-    * Returns the number of available (i.e. unpinned) buffers.
-    * @return the number of available buffers
-    */
-   int available() {
-      return numAvailable;
-   }
-   
-   private Buffer findExistingBuffer(Block blk) {
-      for (Buffer buff : bufferpool) {
-         Block b = buff.block();
-         if (b != null && b.equals(blk))
-            return buff;
-      }
-      return null;
-   }
-   
-   private Buffer chooseUnpinnedBuffer() {
-      
-     /*    for (Buffer buff : bufferpool)
-         if (!buff.isPinned())
-         {
-        	 bufferPoolMap.remove(buff.block());
-        	 return buff;
-         }
-      */
-      
-      while(bufferQueue.peek() != null){
-    	  Buffer tmp = bufferQueue.poll();
-    	  if(!tmp.isPinned()){
-    		  bufferPoolMap.remove(tmp.block());
-    		  return tmp;
-    	  }
-      }
-      
-      return null;
-   }
-   
-   public boolean containsMapping(Block blk){
-	   return bufferPoolMap.containsKey(blk);
-   }
-   
-   public Buffer getMapping(Block blk){
-	   return bufferPoolMap.get(blk);
-   }
+
+import static org.junit.Assert.*;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+
+public class BufferMgrTest {
+
+	@Before
+	public void setUp() throws Exception {
+		 SimpleDB.init("simpleDB");
+	}
+
+	@After
+	public void tearDown() throws Exception {
+	}
+
+	@Test
+	public void testPin() {
+		 System.out.println("testPin start------------------------!");
+
+		 Block[] blk1=new Block[10];
+		 for(int i=0;i<10;i++){
+			 blk1[i] = new Block("filename", i);
+		 }
+		 BufferMgr basicBufferMgr = new SimpleDB().bufferMgr();
+		 //initially, available buffers should be 8
+		 assertEquals(8, basicBufferMgr.available());
+
+		 for(int i=0;i<8;i++){
+			 
+			//pin a block to buffer,if buffer is full, it will wait for some time then fail
+			try {
+			     basicBufferMgr.pin(blk1[i]); //pin a block to buffer
+				 assertEquals(8-i-1, basicBufferMgr.available());	
+			     }
+			catch (BufferAbortException e) {
+				 System.out.println(i+" buffer pin fails!");//buffer pool is full
+			} 
+			
+		 }
+	     
+		 for(int i=7;i<9;i++){
+			 
+				//pin a block to buffer,if buffer is full, it will wait for some time then fail
+				if(basicBufferMgr.containsMapping(blk1[i]))	 System.out.println(i+" buffer map fails!");//buffer pool is full
+				
+				
+			 }
+		 
+		 
+		 System.out.println("testPin end！-------------------------");
+		 blk1=null;
+	}
+/*
+	@Test
+	public void testUnpin() {
+		 System.out.println("testUnpin start------------------------!");
+		 
+		 //initiallize 10 blocks
+		 Block[] blk=new Block[10];
+		 Buffer[] buf=new Buffer[10];
+		 for(int i=0;i<10;i++){
+			 blk[i] = new Block("filename", i);
+		 }
+		 BufferMgr basicBufferMgr = new SimpleDB().bufferMgr();
+		 //initially, available buffers should be 8
+		 assertEquals(8, basicBufferMgr.available());
+		 
+		 //pin
+		 for(int i=0;i<9;i++){
+				try {
+				     buf[i]=basicBufferMgr.pin(blk[i]); //pin a block to buffer
+				     }
+				catch (BufferAbortException e) {
+					 System.out.println(i+" buffer pin fails!");//buffer pool is full
+				}
+		 }
+		 assertEquals(0, basicBufferMgr.available());//since pool is full, available num is 0
+
+		 //unpin
+		 for(int i=0;i<2;i++){
+
+			 //before unpin, available buffers should be i
+			 assertEquals(i, basicBufferMgr.available());
+				try {
+				     basicBufferMgr.unpin(buf[i]); //unpin a buffer
+				     }
+				catch (BufferAbortException e) {
+					 System.out.println(i+" buffer unpin fails!");
+				}
+			 //after pin, the available buffer is increased by 1
+			 assertEquals(i+1, basicBufferMgr.available());
+		 }
+		 
+		 //after unpin, it can pin again!
+			try {
+			     basicBufferMgr.pin(blk[9]); //pin a block to buffer
+			     }
+			catch (BufferAbortException e) {
+				 System.out.println("buffer pin fails after unpin!");
+			}
+			assertEquals(1, basicBufferMgr.available());
+		 System.out.println("testUnpin end！-------------------------");
+		 blk=null;
+		 buf=null;
+	}
+	*/
+	
+
+
+
 }
