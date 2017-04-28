@@ -11,6 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 
+
 public class BufferMgrTest {
 
 	@Before
@@ -24,11 +25,12 @@ public class BufferMgrTest {
 
 	@Test
 	public void testPin() {
-		 System.out.println("testPin start------------------------!");
+		 System.out.println("test Map&LSN start------------------------!");
 
-		 Block[] blk1=new Block[10];
-		 for(int i=0;i<10;i++){
-			 blk1[i] = new Block("filename", i);
+		 Block[] blk=new Block[20];
+		 Buffer[] buf = new Buffer[10];
+		 for(int i=0;i<20;i++){
+			 blk[i] = new Block("filename", i);
 		 }
 		 BufferMgr basicBufferMgr = new SimpleDB().bufferMgr();
 		 //initially, available buffers should be 8
@@ -38,7 +40,7 @@ public class BufferMgrTest {
 			 
 			//pin a block to buffer,if buffer is full, it will wait for some time then fail
 			try {
-			     basicBufferMgr.pin(blk1[i]); //pin a block to buffer
+			     buf[i] = basicBufferMgr.pin(blk[i]); //pin a block to buffer
 				 assertEquals(8-i-1, basicBufferMgr.available());	
 			     }
 			catch (BufferAbortException e) {
@@ -47,48 +49,9 @@ public class BufferMgrTest {
 			
 		 }
 	     
-		 for(int i=7;i<9;i++){
+		 
+		 for(int i=0;i<8;i++){
 			 
-				//pin a block to buffer,if buffer is full, it will wait for some time then fail
-				if(basicBufferMgr.containsMapping(blk1[i]))	 System.out.println(i+" buffer map fails!");//buffer pool is full
-				
-				
-			 }
-		 
-		 
-		 System.out.println("testPin end！-------------------------");
-		 blk1=null;
-	}
-/*
-	@Test
-	public void testUnpin() {
-		 System.out.println("testUnpin start------------------------!");
-		 
-		 //initiallize 10 blocks
-		 Block[] blk=new Block[10];
-		 Buffer[] buf=new Buffer[10];
-		 for(int i=0;i<10;i++){
-			 blk[i] = new Block("filename", i);
-		 }
-		 BufferMgr basicBufferMgr = new SimpleDB().bufferMgr();
-		 //initially, available buffers should be 8
-		 assertEquals(8, basicBufferMgr.available());
-		 
-		 //pin
-		 for(int i=0;i<9;i++){
-				try {
-				     buf[i]=basicBufferMgr.pin(blk[i]); //pin a block to buffer
-				     }
-				catch (BufferAbortException e) {
-					 System.out.println(i+" buffer pin fails!");//buffer pool is full
-				}
-		 }
-		 assertEquals(0, basicBufferMgr.available());//since pool is full, available num is 0
-
-		 //unpin
-		 for(int i=0;i<2;i++){
-
-			 //before unpin, available buffers should be i
 			 assertEquals(i, basicBufferMgr.available());
 				try {
 				     basicBufferMgr.unpin(buf[i]); //unpin a buffer
@@ -98,21 +61,37 @@ public class BufferMgrTest {
 				}
 			 //after pin, the available buffer is increased by 1
 			 assertEquals(i+1, basicBufferMgr.available());
-		 }
+				
+			 }
 		 
-		 //after unpin, it can pin again!
-			try {
-			     basicBufferMgr.pin(blk[9]); //pin a block to buffer
+		 
+		 for(int i = 10; i < 15; i++){
+			 try {
+			     basicBufferMgr.pin(blk[i]); //pin a block to buffer
+				 assertEquals(18- i - 1, basicBufferMgr.available());	
 			     }
 			catch (BufferAbortException e) {
-				 System.out.println("buffer pin fails after unpin!");
-			}
-			assertEquals(1, basicBufferMgr.available());
-		 System.out.println("testUnpin end！-------------------------");
+				 System.out.println(i+" buffer pin fails!");//buffer pool is full
+			} 
+		 }
+		 
+		 for(int i=0;i<15;i++){
+			 
+				//pin a block to buffer,if buffer is full, it will wait for some time then fail
+			 if(i >=3 && i < 10)
+			 	assertFalse(basicBufferMgr.containsMapping(blk[i]));
+			 else
+				assertTrue(basicBufferMgr.containsMapping(blk[i])); 
+				//if(!basicBufferMgr.containsMapping(blk[i]))	 System.out.println(i+" buffer map fails!");//buffer pool is full
+				
+				
+			 }
+		 
+		 
+		 System.out.println("test Map&LSN end!-------------------------");
 		 blk=null;
-		 buf=null;
 	}
-	*/
+
 	
 
 
