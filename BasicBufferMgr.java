@@ -18,7 +18,7 @@ class BasicBufferMgr {
    
    private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
    private PriorityQueue<Buffer> bufferQueue;
-   
+   private int lsncount = 1;
    /**
     * Creates a buffer manager having the specified number 
     * of buffer slots.
@@ -74,7 +74,7 @@ class BasicBufferMgr {
          if (buff == null)
             return null;
          buff.assignToBlock(blk);
-         
+         buff.setLSN(lsncount++);
       // bufferQueue.add(buff);
          bufferPoolMap.put(blk, buff);
       }
@@ -98,6 +98,7 @@ class BasicBufferMgr {
       if (buff == null)
          return null;
       buff.assignToNew(filename, fmtr);
+      buff.setLSN(lsncount++);
       bufferPoolMap.put(buff.block(), buff);
      // bufferQueue.add(buff);
       numAvailable--;
@@ -150,7 +151,7 @@ class BasicBufferMgr {
         
         while(bufferQueue.peek() != null){
 	    	  Buffer tmp = bufferQueue.poll();
-	    	  System.out.println(tmp.block());
+	    	  //System.out.println(tmp.block());
 	    	  if(!tmp.isPinned()){
 	    		  bufferPoolMap.remove(tmp.block());
 	    		  bufferQueue.clear();
