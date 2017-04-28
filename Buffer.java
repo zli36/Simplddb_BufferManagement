@@ -101,6 +101,7 @@ public class Buffer {
 	      logSequenceNumber = lsn;
       contents.setString(offset, val);
    }
+   
 
    /**
     * Returns a reference to the disk block
