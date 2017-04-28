@@ -24,7 +24,7 @@ public class BufferMgrTest {
 	}
 
 	@Test
-	public void testPin() {
+	public void testMap_LSN() {
 		 System.out.println("test Map&LSN start------------------------!");
 
 		 Block[] blk=new Block[20];
