@@ -1,10 +1,9 @@
 package simpledb.buffer;
 
 import simpledb.file.*;
-import java.util.HashMap; 
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.PriorityQueue;
-
 /**
  * Manages the pinning and unpinning of buffers to blocks.
  * @author Edward Sciore
@@ -16,19 +15,9 @@ class BasicBufferMgr {
    
    
    
-   /*new code for hashmap,
-    *put in the hashmap when pinNew,
-    *delete from map when flush.
-    *Meanwhile use ProrityQueue to choose LSN*/
+   
    private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
-   private PriorityQueue<Buffer> bufferQueue = new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>() {  
-       public int compare(Buffer b1, Buffer b2) {  
-           return b2.getLSN() - b1.getLSN();  
-         }  
-       });
-   
-   
-   
+   private PriorityQueue<Buffer> bufferQueue;
    
    /**
     * Creates a buffer manager having the specified number 
@@ -48,6 +37,15 @@ class BasicBufferMgr {
       numAvailable = numbuffs;
       for (int i=0; i<numbuffs; i++)
          bufferpool[i] = new Buffer();
+      
+      
+      
+      
+      bufferQueue= new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>(){
+		   public int compare(Buffer b1, Buffer b2){
+			   return b2.getLSN() - b1.getLSN();
+		   }
+  });
    }
    
    /**
@@ -57,10 +55,7 @@ class BasicBufferMgr {
    synchronized void flushAll(int txnum) {
       for (Buffer buff : bufferpool)
          if (buff.isModifiedBy(txnum))
-         {buff.flush();
-         //bufferPoolMap.remove(buff.block());
-         //bufferQueue.add(buff);
-         }
+         buff.flush();
    }
    
    /**
@@ -80,15 +75,12 @@ class BasicBufferMgr {
             return null;
          buff.assignToBlock(blk);
          
-         /* new code here, add this buffer into hashmap and queue*/
          
-         bufferPoolMap.put(buff.block(), buff);
-         //bufferQueue.offer(buff);
+         bufferPoolMap.put(blk, buff);
       }
       if (!buff.isPinned())
          numAvailable--;
       buff.pin();
-      //bufferPoolMap.put(buff.block(), buff);//junk code
       return buff;
    }
    
@@ -106,14 +98,9 @@ class BasicBufferMgr {
       if (buff == null)
          return null;
       buff.assignToNew(filename, fmtr);
+      bufferPoolMap.put(buff.block(), buff);
       numAvailable--;
       buff.pin();
-      
-       /* new code here, add this buffer into hashmap and queue*/
-      bufferPoolMap.put(buff.block(), buff);
-      //bufferQueue.offer(buff);
-      
-      
       return buff;
    }
    
@@ -123,14 +110,10 @@ class BasicBufferMgr {
     */
    synchronized void unpin(Buffer buff) {
       buff.unpin();
-      //bufferPoolMap.remove(buff.block());// junk code
       if (!buff.isPinned())
       {
-    	  numAvailable++;
-         
-         /*new code here, offer this useless buffer into queue*/
-         
     	  bufferQueue.offer(buff);
+    	  numAvailable++;
       }
    }
    
@@ -149,16 +132,18 @@ class BasicBufferMgr {
             return buff;
       }
       return null;
-      
-      
    }
    
    private Buffer chooseUnpinnedBuffer() {
-      for (Buffer buff : bufferpool)
-         if (!buff.isPinned())
-         return buff;
       
-      /* new code here, choose the LSN from queue, if it is unpinned, remove from hashmap and queue*/
+     /*    for (Buffer buff : bufferpool)
+         if (!buff.isPinned())
+         {
+        	 bufferPoolMap.remove(buff.block());
+        	 return buff;
+         }
+      */
+      
       while(bufferQueue.peek() != null){
     	  Buffer tmp = bufferQueue.poll();
     	  if(!tmp.isPinned()){
@@ -166,6 +151,15 @@ class BasicBufferMgr {
     		  return tmp;
     	  }
       }
+      
       return null;
+   }
+   
+   public boolean containsMapping(Block blk){
+	   return bufferPoolMap.containsKey(blk);
+   }
+   
+   public Buffer getMapping(Block blk){
+	   return bufferPoolMap.get(blk);
    }
 }
