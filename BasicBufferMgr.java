@@ -18,7 +18,7 @@ class BasicBufferMgr {
    
    private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
    private PriorityQueue<Buffer> bufferQueue;
-   private int lsncount = 1;
+   //private int lsncount = 1;
    /**
     * Creates a buffer manager having the specified number 
     * of buffer slots.
@@ -43,7 +43,7 @@ class BasicBufferMgr {
       
       bufferQueue= new PriorityQueue<Buffer>(bufferpool.length,new Comparator<Buffer>(){
 		   public int compare(Buffer b1, Buffer b2){
-			   return b2.getLSN() - b1.getLSN();
+			   return b1.getLSN() - b2.getLSN();
 		   }
   });
    }
@@ -74,7 +74,7 @@ class BasicBufferMgr {
          if (buff == null)
             return null;
          buff.assignToBlock(blk);
-         buff.setLSN(lsncount++);
+       //  buff.setLSN(lsncount++);
       // bufferQueue.add(buff);
          bufferPoolMap.put(blk, buff);
       }
@@ -98,7 +98,7 @@ class BasicBufferMgr {
       if (buff == null)
          return null;
       buff.assignToNew(filename, fmtr);
-      buff.setLSN(lsncount++);
+     // buff.setLSN(lsncount++);
       bufferPoolMap.put(buff.block(), buff);
      // bufferQueue.add(buff);
       numAvailable--;
