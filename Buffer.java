@@ -83,6 +83,10 @@ public class Buffer {
       contents.setInt(offset, val);
    }
 
+   /**
+    * Set a specific LSN to a buffer
+    * @param lsn
+    */
 	public void setLSN(int lsn){
 	   if(lsn >= 0)
 		   logSequenceNumber = lsn;
@@ -157,9 +161,14 @@ public class Buffer {
       return pins > 0;
    }
    
+   /**
+    * Get the logsequenceNumber for a specific buffer
+    * @return the number of logSequenceNumber
+    */
    public int getLSN(){
 	   return logSequenceNumber;
    }
+   
    /**
     * Returns true if the buffer is dirty
     * due to a modification by the specified transaction.
@@ -170,6 +179,9 @@ public class Buffer {
       return txnum == modifiedBy;
    }
 
+   boolean CurModifiedBy(){
+	   return modifiedBy >= 0;
+   }
    /**
     * Reads the contents of the specified block into
     * the buffer's page.

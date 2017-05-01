@@ -14,7 +14,9 @@ class BasicBufferMgr {
    private int numAvailable;
    
    
-   
+   /**
+    * initial a HashMap and priorityQueue to store the buffer data
+    */
    
    private HashMap<Block,Buffer> bufferPoolMap = new HashMap<Block,Buffer>();
    private PriorityQueue<Buffer> bufferQueue;
@@ -85,6 +87,7 @@ class BasicBufferMgr {
       if (!buff.isPinned())
          numAvailable--;
       buff.pin();
+      
       return buff;
    }
    
@@ -151,7 +154,9 @@ class BasicBufferMgr {
         	 //return buff;
         	bufferQueue.offer(buff); 
          }
-     
+//        if(buff.CurModifiedBy()){
+//        	bufferQueue.offer(buff);
+//        }
         
         while(bufferQueue.peek() != null){
 	    	  Buffer tmp = bufferQueue.poll();
@@ -162,7 +167,6 @@ class BasicBufferMgr {
 	    		  return tmp;
 	    	  }
 	      }
-      
       
       return null;
    }

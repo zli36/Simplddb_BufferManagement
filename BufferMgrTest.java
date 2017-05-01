@@ -100,7 +100,8 @@ public class BufferMgrTest {
 			//pin a block to buffer,if buffer is full, it will wait for some time then fail
 			try {
 			     buf[i] = basicBufferMgr.pin(blk[i]); //pin a block to buffer
-			     buf[i].setLSN(8-i);
+			     //buf[i].setLSN(8-i);
+			     buf[i].setInt(i,i,i,8-i);
 				 assertEquals(8-i-1, basicBufferMgr.available());	
 			     }
 			catch (BufferAbortException e) {
@@ -129,7 +130,8 @@ public class BufferMgrTest {
 			 try {
 			     basicBufferMgr.pin(blk[i]); //pin a block to buffer
 			     Buffer tmp = basicBufferMgr.getMapping(blk[i]);
-			     tmp.setLSN(15-i);
+			     //tmp.setLSN(15-i);
+			     tmp.setInt(i, i, i, 15-i);
 				 assertEquals(18- i - 1, basicBufferMgr.available());	
 			     }
 			catch (BufferAbortException e) {
@@ -148,12 +150,15 @@ public class BufferMgrTest {
 				
 				
 			 }
+		 assertEquals(buf[0],basicBufferMgr.getMapping(blk[0]));
+		 assertEquals(buf[7],basicBufferMgr.getMapping(blk[10]));
 		 
 		 for(int i = 15; i < 20; i++){
 			 try {
 			     basicBufferMgr.pin(blk[i]); //pin a block to buffer
 			     Buffer tmp = basicBufferMgr.getMapping(blk[i]);
-			     tmp.setLSN(20-i);
+			     //tmp.setLSN(20-i);
+			     tmp.setInt(i,i,i,20 - i);
 				 //assertEquals(18- i - 1, basicBufferMgr.available());	
 			     }
 			catch (BufferAbortException e) {
