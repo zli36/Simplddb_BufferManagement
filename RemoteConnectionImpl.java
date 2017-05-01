@@ -60,6 +60,7 @@ class RemoteConnectionImpl extends UnicastRemoteObject implements RemoteConnecti
       tx = new Transaction();
       System.out.println("sbsbsbsb");
       FileMgr.getFileStatistics();
+      SimpleDB.bufferMgr().getBufferStatistics();
    }
    
    /**
@@ -70,6 +71,8 @@ class RemoteConnectionImpl extends UnicastRemoteObject implements RemoteConnecti
       tx.rollback();
       tx = new Transaction();
       FileMgr.getFileStatistics();
+      SimpleDB.bufferMgr().getBufferStatistics();
+      
    }
 }
 
