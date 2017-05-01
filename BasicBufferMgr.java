@@ -57,7 +57,11 @@ class BasicBufferMgr {
          if (buff.isModifiedBy(txnum))
          buff.flush();
    }
-   
+   public void set_buffer(){
+	   for(Buffer buff: bufferpool){
+             buff.setInt(1,1,1,1);		   
+	   }
+   }
    /**
     * Pins a buffer to the specified block. 
     * If there is already a buffer assigned to that block
