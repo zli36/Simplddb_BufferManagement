@@ -110,6 +110,13 @@ public class BufferMgr {
       bufferMgr.flushAll(txnum);
    }
    
+   public void set_buffer_main(){
+	   bufferMgr.set_buffer();
+   }
+   public static void getBufferStatistics(){
+	   System.out.println("number of buffer read: " + Buffer.re_read());
+	   System.out.println("number of buffer write: " + Buffer.re_write());
+   }
    /**
     * Returns the number of available (ie unpinned) buffers.
     * @return the number of available buffers
@@ -129,4 +136,3 @@ public class BufferMgr {
       return System.currentTimeMillis() - starttime > MAX_TIME;
    }
 }
-
